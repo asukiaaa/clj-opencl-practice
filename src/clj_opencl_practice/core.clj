@@ -1,12 +1,42 @@
 (ns clj-opencl-practice.core
-  (:require [uncomplicate.clojurecl.core :refer :all]
+  (:require [clj-time.core :as t]
+            [uncomplicate.clojurecl.core :refer :all]
             [uncomplicate.clojurecl.info :refer :all]
             [uncomplicate.commons.core :refer [release]]))
+
+(def times (atom []))
+
+(defn record-time [name]
+  (reset! times (conj @times [name (t/now)])))
+
+(defn show-last-time-diff []
+  (let [prev-current (take-last 2 @times)
+        prev (first prev-current)
+        prev-time (last prev)
+        current (last prev-current)
+        current-time (last current)
+        current-name (first current)]
+    (prn prev-time current-time)
+    (prn current-name (t/in-millis (t/interval prev-time current-time)))))
+
+(defn record-and-show-diff [name]
+  (record-time name)
+  (show-last-time-diff))
+
+(defn print-matrix [values w h]
+  (doall
+   (for [line (partition w values)]
+     (prn line))))
+
+(record-time "start")
 
 (def first-platform (first (platforms)))
 (def first-gpu (first (devices first-platform)))
 (def ctx (context [first-gpu]))
 (def queue (command-queue ctx first-gpu))
+
+(record-and-show-diff "loaded gpu info")
+
 (def kernel-source "
   __kernel void matrix_dot_matrix(
     __global const float* A,
@@ -49,33 +79,31 @@
                                  2
                                  1)))))
 (def matrix-result (float-array (* r-width r-height)))
-
-(defn print-matrix [values w h]
-  (doall
-   (for [line (partition w values)]
-     (prn line))))
+(print-matrix matrix-a a-width a-height)
+(print-matrix matrix-b b-width b-height)
+(enq-write! queue matrix-a-buffer matrix-a)
+(enq-write! queue matrix-b-buffer matrix-b)
+(record-and-show-diff "hold buffers")
 
 (defn -main []
   (let [kernels (build-program! (program-with-source ctx [kernel-source]))
+        _ (record-and-show-diff "set kernel source")
         k (kernel kernels "matrix_dot_matrix")]
-    (print-matrix matrix-a a-width a-height)
-    (print-matrix matrix-b b-width b-height)
-    (enq-write! queue matrix-a-buffer matrix-a)
-    (enq-write! queue matrix-b-buffer matrix-b)
-    (println "enque")
+    (record-and-show-diff "loaded kernel")
     (set-arg! k 0 matrix-a-buffer)
     (set-arg! k 1 matrix-b-buffer)
     (set-arg! k 2 matrix-result-buffer)
     (set-arg! k 3 (int-array [a-width]))
     (set-arg! k 4 (int-array [b-width]))
-    (println "set-args")
+    (record-and-show-diff "set args")
     (enq-nd! queue k (work-size-2d r-width r-height))
-    (println "execute")
     (enq-read! queue matrix-result-buffer matrix-result)
     (print-matrix matrix-result r-width r-height)
+    (record-and-show-diff "loaded result")
     (release matrix-a)
     (release matrix-b)
     (release matrix-result)
     (release kernels)
     (release queue)
-    (release ctx)))
+    (release ctx)
+    (record-and-show-diff "released resources")))
