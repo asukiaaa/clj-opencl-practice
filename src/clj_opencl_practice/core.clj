@@ -9,6 +9,9 @@
 (defn record-time [name]
   (reset! times (conj @times [name (t/now)])))
 
+(defn get-millis [prev-time current-time]
+  (t/in-millis (t/interval prev-time current-time)))
+
 (defn show-last-time-diff []
   (let [prev-current (take-last 2 @times)
         prev (first prev-current)
@@ -16,17 +19,30 @@
         current (last prev-current)
         current-time (last current)
         current-name (first current)]
-    (prn prev-time current-time)
-    (prn current-name (t/in-millis (t/interval prev-time current-time)))))
+    (prn current-name (get-millis prev-time current-time))))
 
 (defn record-and-show-diff [name]
   (record-time name)
   (show-last-time-diff))
 
 (defn print-matrix [values w h]
-  (doall
-   (for [line (partition w values)]
-     (prn line))))
+  (if (> w 10)
+    (prn (take 1 values))
+    (doall
+     (for [line (partition w values)]
+       (prn line)))))
+
+(defn show-times []
+  (reduce (fn [prev current]
+            (let [prev-time (last prev)
+                  current-time (last current)
+                  current-name (first current)])
+            (prn (first current) (get-millis (last prev) (last current)))
+            current)
+          @times)
+  (prn "Total (without waking up time of clojure)"
+       (get-millis (last (first @times))
+                   (last (last @times)))))
 
 (record-time "start")
 
@@ -35,7 +51,7 @@
 (def ctx (context [first-gpu]))
 (def queue (command-queue ctx first-gpu))
 
-(record-and-show-diff "loaded gpu info")
+(record-time "loaded gpu info")
 
 (def kernel-source "
   __kernel void matrix_dot_matrix(
@@ -59,10 +75,15 @@
     }
     Result[y * wB + x] = value;
   }")
+(def kernels (build-program! (program-with-source ctx [kernel-source])))
+(record-time "set kernel source")
+(def multiply-matrixes-kernel (kernel kernels "matrix_dot_matrix"))
+(record-time "load kernel")
 
-(def a-width 10)
-(def a-height 10)
-(def b-width 10)
+(def matrix-len 10)
+(def a-width matrix-len)
+(def a-height matrix-len)
+(def b-width matrix-len)
 (def b-height a-width)
 (def r-width b-width)
 (def r-height a-height)
@@ -83,27 +104,28 @@
 (print-matrix matrix-b b-width b-height)
 (enq-write! queue matrix-a-buffer matrix-a)
 (enq-write! queue matrix-b-buffer matrix-b)
-(record-and-show-diff "hold buffers")
+(record-time "hold buffers")
+
+(defn release-resources []
+  (release matrix-a)
+  (release matrix-b)
+  (release matrix-result)
+  (release kernels)
+  (release queue)
+  (release ctx))
 
 (defn -main []
-  (let [kernels (build-program! (program-with-source ctx [kernel-source]))
-        _ (record-and-show-diff "set kernel source")
-        k (kernel kernels "matrix_dot_matrix")]
-    (record-and-show-diff "loaded kernel")
+  (let [k multiply-matrixes-kernel]
     (set-arg! k 0 matrix-a-buffer)
     (set-arg! k 1 matrix-b-buffer)
     (set-arg! k 2 matrix-result-buffer)
     (set-arg! k 3 (int-array [a-width]))
     (set-arg! k 4 (int-array [b-width]))
-    (record-and-show-diff "set args")
+    (record-time "set args")
     (enq-nd! queue k (work-size-2d r-width r-height))
     (enq-read! queue matrix-result-buffer matrix-result)
     (print-matrix matrix-result r-width r-height)
-    (record-and-show-diff "loaded result")
-    (release matrix-a)
-    (release matrix-b)
-    (release matrix-result)
-    (release kernels)
-    (release queue)
-    (release ctx)
-    (record-and-show-diff "released resources")))
+    (record-time "load result")
+    (release-resources)
+    (record-time "releas resources")
+    (show-times)))
