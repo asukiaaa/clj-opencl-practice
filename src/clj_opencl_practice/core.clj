@@ -79,10 +79,16 @@
 (def mul-matrixes-k (kernel kernels "matrix_dot_matrix"))
 (record-time "load kernel")
 
-(def matrix-len 10)
-(def a-width matrix-len)
-(def a-height matrix-len)
-(def b-width matrix-len)
+(def args *command-line-args*)
+(def arg-matrix-len (when (= 1 (count args)) (Integer/parseInt (first args))))
+(def arg-a-width (when (= 3 (count args)) (Integer/parseInt (first args))))
+(def arg-a-height (when (= 3 (count args)) (Integer/parseInt (second args))))
+(def arg-b-width (when (= 3 (count args)) (Integer/parseInt (nth args 2))))
+
+(def matrix-len (or arg-matrix-len 10))
+(def a-width (or arg-a-width matrix-len))
+(def a-height (or arg-a-height matrix-len))
+(def b-width (or arg-b-width matrix-len))
 (def b-height a-width)
 (def r-width b-width)
 (def r-height a-height)
@@ -113,7 +119,7 @@
   (release queue)
   (release ctx))
 
-(defn -main []
+(defn -main [& args]
   (set-arg! mul-matrixes-k 0 matrix-a-buffer)
   (set-arg! mul-matrixes-k 1 matrix-b-buffer)
   (set-arg! mul-matrixes-k 2 matrix-result-buffer)

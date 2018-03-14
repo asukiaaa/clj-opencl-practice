@@ -43,10 +43,16 @@
 
 (record-time "start")
 
-(def matrix-len 10)
-(def a-width matrix-len)
-(def a-height matrix-len)
-(def b-width matrix-len)
+(def args *command-line-args*)
+(def arg-matrix-len (when (= 1 (count args)) (Integer/parseInt (first args))))
+(def arg-a-width (when (= 3 (count args)) (Integer/parseInt (first args))))
+(def arg-a-height (when (= 3 (count args)) (Integer/parseInt (second args))))
+(def arg-b-width (when (= 3 (count args)) (Integer/parseInt (nth args 2))))
+
+(def matrix-len (or arg-matrix-len 10))
+(def a-width (or arg-a-width matrix-len))
+(def a-height (or arg-a-height matrix-len))
+(def b-width (or arg-b-width matrix-len))
 (def b-height a-width)
 (def r-width b-width)
 (def r-height a-height)
@@ -71,7 +77,7 @@
             0
             (range a-width))))
 
-(defn -main []
+(defn -main [& args]
   (print-matrix (mul-matrixes matrix-a matrix-b a-width b-width r-width r-height) r-width r-height)
   (record-time "get result")
   (show-times))
