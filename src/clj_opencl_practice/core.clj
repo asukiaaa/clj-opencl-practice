@@ -1,7 +1,6 @@
 (ns clj-opencl-practice.core
   (:require [clj-time.core :as t]
             [uncomplicate.clojurecl.core :refer :all]
-            [uncomplicate.clojurecl.info :refer :all]
             [uncomplicate.commons.core :refer [release]]))
 
 (def times (atom []))
