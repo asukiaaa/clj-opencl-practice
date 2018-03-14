@@ -2,8 +2,14 @@
 A project for my practice with using OpenCL from clojure.
 
 # Usage
+## With clojurecl
 ```
 lein run
+```
+
+## Naive
+```
+lein run -m clj-opencl-practice.naive
 ```
 
 # License
